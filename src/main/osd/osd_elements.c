@@ -701,7 +701,14 @@ static void osdElementCrashFlipArrow(osdElementParms_t *element)
 }
 #endif // USE_ACC
 
-static void osdBackgroundCrosshairs(osdElementParms_t *element)
+// static void osdBackgroundCrosshairs(osdElementParms_t *element)
+// {
+//     element->buff[0] = SYM_AH_CENTER_LINE;
+//     element->buff[1] = SYM_AH_CENTER;
+//     element->buff[2] = SYM_AH_CENTER_LINE_RIGHT;
+//     element->buff[3] = 0;
+// }
+static void osdCrosshairs(osdElementParms_t *element)
 {
     element->buff[0] = SYM_AH_CENTER_LINE;
     element->buff[1] = SYM_AH_CENTER;
@@ -1598,7 +1605,7 @@ const osdElementDrawFn osdElementDrawFunction[OSD_ITEM_COUNT] = {
     [OSD_CAMERA_FRAME]            = NULL,  // only has background. Added first so it's the lowest "layer" and doesn't cover other elements
     [OSD_RSSI_VALUE]              = osdElementRssi,
     [OSD_MAIN_BATT_VOLTAGE]       = osdElementMainBatteryVoltage,
-    [OSD_CROSSHAIRS]              = NULL,  // only has background
+    [OSD_CROSSHAIRS]              = osdCrosshairs,
 #ifdef USE_ACC
     [OSD_ARTIFICIAL_HORIZON]      = osdElementArtificialHorizon,
 #endif
@@ -1704,7 +1711,7 @@ const osdElementDrawFn osdElementDrawFunction[OSD_ITEM_COUNT] = {
 
 const osdElementDrawFn osdElementBackgroundFunction[OSD_ITEM_COUNT] = {
     [OSD_CAMERA_FRAME]            = osdBackgroundCameraFrame,
-    [OSD_CROSSHAIRS]              = osdBackgroundCrosshairs,
+   //  [OSD_CROSSHAIRS]              = osdBackgroundCrosshairs,
     [OSD_HORIZON_SIDEBARS]        = osdBackgroundHorizonSidebars,
     [OSD_CRAFT_NAME]              = osdBackgroundCraftName,
 #ifdef USE_OSD_STICK_OVERLAY
