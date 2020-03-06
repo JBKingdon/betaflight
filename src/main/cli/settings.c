@@ -915,6 +915,11 @@ const clivalue_t valueTable[] = {
     { "pitch_rate_limit",           VAR_UINT16 | PROFILE_RATE_VALUE, .config.minmaxUnsigned = { CONTROL_RATE_CONFIG_RATE_LIMIT_MIN, CONTROL_RATE_CONFIG_RATE_LIMIT_MAX }, PG_CONTROL_RATE_PROFILES, offsetof(controlRateConfig_t, rate_limit[FD_PITCH]) },
     { "yaw_rate_limit",             VAR_UINT16 | PROFILE_RATE_VALUE, .config.minmaxUnsigned = { CONTROL_RATE_CONFIG_RATE_LIMIT_MIN, CONTROL_RATE_CONFIG_RATE_LIMIT_MAX }, PG_CONTROL_RATE_PROFILES, offsetof(controlRateConfig_t, rate_limit[FD_YAW]) },
 
+// Settings for vbat throttle compensation
+    { "throttle_comp_vmin",         VAR_UINT16  | PROFILE_RATE_VALUE, .config.minmaxUnsigned = { 250, 400 }, PG_CONTROL_RATE_PROFILES, offsetof(controlRateConfig_t, throttle_comp_vmin) },
+    { "throttle_comp_vmax",         VAR_UINT16  | PROFILE_RATE_VALUE, .config.minmaxUnsigned = { 300, 450 }, PG_CONTROL_RATE_PROFILES, offsetof(controlRateConfig_t, throttle_comp_vmax) },
+    { "throttle_comp_cut",          VAR_UINT8   | PROFILE_RATE_VALUE, .config.minmaxUnsigned = { 0, 50 }, PG_CONTROL_RATE_PROFILES, offsetof(controlRateConfig_t, throttle_comp_cut) },
+
 // PG_SERIAL_CONFIG
     { "reboot_character",           VAR_UINT8  | MASTER_VALUE, .config.minmaxUnsigned = { 48, 126 }, PG_SERIAL_CONFIG, offsetof(serialConfig_t, reboot_character) },
     { "serial_update_rate_hz",      VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { 100, 2000 }, PG_SERIAL_CONFIG, offsetof(serialConfig_t, serial_update_rate_hz) },

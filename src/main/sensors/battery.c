@@ -227,7 +227,7 @@ void batteryUpdatePresence(void)
     }
     if (debugMode == DEBUG_BATTERY) {
         debug[2] = batteryCellCount;
-        debug[3] = isVoltageStable();
+        //debug[3] = isVoltageStable();
     }
 }
 

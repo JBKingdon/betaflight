@@ -58,6 +58,9 @@ typedef struct controlRateConfig_s {
     uint8_t throttle_limit_percent;         // Sets the maximum pilot commanded throttle limit
     uint16_t rate_limit[3];                 // Sets the maximum rate for the axes
     uint8_t tpaMode;                        // Controls which PID terms TPA effects
+    uint8_t throttle_comp_cut;              // % to reduce throttle by above max voltage
+    uint16_t throttle_comp_vmin;            // voltage below which throttle cut reduces to 0
+    uint16_t throttle_comp_vmax;            // voltage above which throttle is reduced by throttle_comp_cut %
     char profileName[MAX_RATE_PROFILE_NAME_LENGTH + 1]; // Descriptive name for rate profile
 } controlRateConfig_t;
 

@@ -740,6 +740,35 @@ static void applyMixToMotors(float motorMix[MAX_SUPPORTED_MOTORS], motorMixer_t 
     }
 }
 
+// Scale the throttle value according to battery voltage
+static float applyThrottleCompensation(float throttle)
+{
+    if (currentControlRateProfile->throttle_comp_cut == 0)
+        return throttle;
+
+    const uint16_t bv = getBatteryAverageCellVoltage(); // units of .01V
+
+    float cut; // the effective throttle cut in the range 0 to 1
+
+    if (bv < currentControlRateProfile->throttle_comp_vmin) {
+        cut = 0.0;
+    } else if (bv > currentControlRateProfile->throttle_comp_vmax) {
+        cut = ((float)currentControlRateProfile->throttle_comp_cut)/100.0f; // throttle_comp_cut is in percent, 0 through 100
+    } else {
+        // linearly scale between 0 and throttle_comp_cut
+        // min, max, bv are all in units of .01V, scale is in the range 0 to 1
+        const float range = (float)(currentControlRateProfile->throttle_comp_vmax - currentControlRateProfile->throttle_comp_vmin);
+        const float scale = ((float)(bv - currentControlRateProfile->throttle_comp_vmin))/range;
+        cut = ((float)currentControlRateProfile->throttle_comp_cut)/100.0f * scale;
+    }
+
+    if (debugMode == DEBUG_BATTERY)
+        debug[3] = (int16_t)(cut * 100); // show as percentage
+
+    return throttle * (1.0f - cut);
+}
+
+
 static float applyThrottleLimit(float throttle)
 {
     if (currentControlRateProfile->throttle_limit_percent < 100) {
@@ -747,6 +776,7 @@ static float applyThrottleLimit(float throttle)
         switch (currentControlRateProfile->throttle_limit_type) {
             case THROTTLE_LIMIT_TYPE_SCALE:
                 return throttle * throttleLimitFactor;
+
             case THROTTLE_LIMIT_TYPE_CLIP:
                 return MIN(throttle, throttleLimitFactor);
         }
@@ -831,6 +861,9 @@ FAST_CODE_NOINLINE void mixTable(timeUs_t currentTimeUs, uint8_t vbatPidCompensa
     if (currentControlRateProfile->throttle_limit_type != THROTTLE_LIMIT_TYPE_OFF) {
         throttle = applyThrottleLimit(throttle);
     }
+    
+    // adjusts the throttle value according to the battery level
+    throttle = applyThrottleCompensation(throttle);
 
     const bool airmodeEnabled = airmodeIsEnabled() || launchControlActive;
 

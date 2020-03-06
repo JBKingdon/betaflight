@@ -63,6 +63,9 @@ void pgResetFn_controlRateProfiles(controlRateConfig_t *controlRateConfig)
             .rate_limit[FD_PITCH] = CONTROL_RATE_CONFIG_RATE_LIMIT_MAX,
             .rate_limit[FD_YAW] = CONTROL_RATE_CONFIG_RATE_LIMIT_MAX,
             .tpaMode = TPA_MODE_D,
+            .throttle_comp_cut = 0,
+            .throttle_comp_vmin = 350,
+            .throttle_comp_vmax = 400,
             .profileName = { 0 },
         );
     }
