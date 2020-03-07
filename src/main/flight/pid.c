@@ -225,6 +225,7 @@ void resetPidProfile(pidProfile_t *pidProfile)
         .ff_boost = 15,
         .dyn_lpf_curve_expo = 0,
         .level_race_mode = false,
+        .motor_output_limit_min = 100,
     );
 #ifndef USE_D_MIN
     pidProfile->pid[PID_ROLL].D = 30;

@@ -297,6 +297,7 @@ static FAST_RAM_ZERO_INIT float idleMinMotorRps;
 static FAST_RAM_ZERO_INIT float idleP;
 #endif
 
+static FAST_RAM_ZERO_INIT float motorOutputLimitReduction;
 
 uint8_t getMotorCount(void)
 {
@@ -363,6 +364,10 @@ void mixerInit(mixerMode_e mixerMode)
     idleThrottleOffset = motorConfig()->digitalIdleOffsetValue * 0.0001f;
     idleP = currentPidProfile->idle_p * 0.0001f;
 #endif
+    motorOutputLimitReduction = 0.0f;
+    if (currentPidProfile->motor_output_limit_min < currentPidProfile->motor_output_limit) {
+        motorOutputLimitReduction = (float)currentPidProfile->motor_output_limit_min / (float)currentPidProfile->motor_output_limit;
+    }
 }
 
 #ifdef USE_LAUNCH_CONTROL
@@ -486,6 +491,7 @@ static void calculateThrottleAndCurrentMotorEndpoints(timeUs_t currentTimeUs)
     static uint16_t rcThrottlePrevious = 0;   // Store the last throttle direction for deadband transitions
     static timeUs_t reversalTimeUs = 0; // time when motors last reversed in 3D mode
     static float motorRangeMinIncrease = 0;
+    static float motorRangeMaxDecrease = 0;
 #ifdef USE_DYN_IDLE
     static float oldMinRps;
 #endif
@@ -613,11 +619,28 @@ static void calculateThrottleAndCurrentMotorEndpoints(timeUs_t currentTimeUs)
 
         }
 #endif
+
+        // JBK
+        // reduce motorRangeMax when battery is full
+        const float currentCellVoltage = ((float)getBatteryAverageCellVoltage())/100.0f; // convert from units of .01V
+        const float vbatwarningcellvoltage = ((float)currentControlRateProfile->throttle_comp_vmin)/100.0f;
+        const float vbatmaxcellvoltage = ((float)currentControlRateProfile->throttle_comp_vmax)/100.0f;
+        const float vBatRange = vbatmaxcellvoltage - vbatwarningcellvoltage;
+
+        if (motorOutputLimitReduction != 0.0f) {
+            float vBatFactor;
+            // vBatFactor = 0 when batV is >= vbatmaxcellvoltage, and 1 when current is <= vbatwarningcellvoltage
+            vBatFactor = (vbatmaxcellvoltage - MAX(currentCellVoltage, vbatwarningcellvoltage)) / vBatRange;
+            if (vBatFactor<0) vBatFactor = 0;
+            motorRangeMaxDecrease = (1.0f - vBatFactor) * (1-motorOutputLimitReduction);
+        }
+
         currentThrottleInputRange = rcCommandThrottleRange;
         motorRangeMin = motorOutputLow + motorRangeMinIncrease * (motorOutputHigh - motorOutputLow);
-        motorRangeMax = motorOutputHigh;
+        motorRangeMax = motorOutputHigh - motorRangeMaxDecrease * (motorOutputHigh - motorOutputLow); 
+        debug[3] = motorRangeMax;
         motorOutputMin = motorRangeMin;
-        motorOutputRange = motorOutputHigh - motorOutputMin;
+        motorOutputRange = motorRangeMax - motorOutputMin;
         motorOutputMixSign = 1;
     }
 
@@ -740,7 +763,7 @@ static void applyMixToMotors(float motorMix[MAX_SUPPORTED_MOTORS], motorMixer_t 
     }
 }
 
-// Scale the throttle value according to battery voltage
+// JBK Scale the throttle value according to battery voltage
 static float applyThrottleCompensation(float throttle)
 {
     if (currentControlRateProfile->throttle_comp_cut == 0)
@@ -863,7 +886,7 @@ FAST_CODE_NOINLINE void mixTable(timeUs_t currentTimeUs, uint8_t vbatPidCompensa
     }
     
     // adjusts the throttle value according to the battery level
-    throttle = applyThrottleCompensation(throttle);
+    // throttle = applyThrottleCompensation(throttle);
 
     const bool airmodeEnabled = airmodeIsEnabled() || launchControlActive;
 
