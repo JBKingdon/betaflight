@@ -166,6 +166,8 @@ static void handleCrsfLinkStatisticsFrame(const crsfLinkStatistics_t* statsPtr, 
         rssiDbm = stats.uplink_SNR;
     }
     setRssiDbm(rssiDbm, RSSI_SOURCE_RX_PROTOCOL_CRSF);
+    int16_t rssiSNR = stats.uplink_SNR;
+    setRssiSNR(rssiSNR, RSSI_SOURCE_RX_PROTOCOL_CRSF);
 #endif
 
 #ifdef USE_RX_LINK_QUALITY_INFO
