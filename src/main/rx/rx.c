@@ -817,7 +817,7 @@ int16_t getRssiSNR(void)
     return rssiSNR;
 }
 
-#define RSSI_SAMPLE_COUNT_SNR 4
+#define RSSI_SAMPLE_COUNT_SNR 8
 
 static int16_t updateRssiSNRSamples(int16_t value)
 {
@@ -825,8 +825,8 @@ static int16_t updateRssiSNRSamples(int16_t value)
     static uint8_t sampleSNRIndex = 0;
     static int sumSNR = 0;
 
-    sumSNR += value - samplesSNR[sampleSNRIndex];
-    samplesSNR[sampleSNRIndex] = value;
+    sumSNR += value*10 - samplesSNR[sampleSNRIndex];
+    samplesSNR[sampleSNRIndex] = value*10;
     sampleSNRIndex = (sampleSNRIndex + 1) % RSSI_SAMPLE_COUNT_SNR;
     return sumSNR / RSSI_SAMPLE_COUNT_SNR;
 }
