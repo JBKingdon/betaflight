@@ -50,3 +50,8 @@ ubuntu*.log
 
 # EEPROM image file (created by SITL)
 eeprom.bin
+
+# artefacts for atom
+.tags
+.tags1
+tags

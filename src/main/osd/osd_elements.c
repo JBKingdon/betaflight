@@ -1193,7 +1193,9 @@ static void osdElementRtcTime(osdElementParms_t *element)
 #ifdef USE_RX_RSSI_DBM
 static void osdElementRssiDbm(osdElementParms_t *element)
 {
-    tfp_sprintf(element->buff, "%c%3d/%3d", SYM_RSSI, getRssiDbm(), getRssiSNR());
+    int8_t snrUnits = getRssiSNR() / 10;
+    int8_t snrTenths = getRssiSNR() % 10;
+    tfp_sprintf(element->buff, "%c%3d/%2d.%u", SYM_RSSI, getRssiDbm(), snrUnits, snrTenths);
 }
 #endif // USE_RX_RSSI_DBM
 
