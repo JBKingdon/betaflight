@@ -48,7 +48,8 @@
 
 #include "telemetry/crsf.h"
 
-#define CRSF_TIME_NEEDED_PER_FRAME_US   1100 // 700 ms + 400 ms for potential ad-hoc request
+// #define CRSF_TIME_NEEDED_PER_FRAME_US   1100 // 700 us + 400 us for potential ad-hoc request
+#define CRSF_TIME_NEEDED_PER_FRAME_US   500 // JBK has to be less than the packet interval. With ELRS extensions and 600k baud actual uart time is about 200us
 #define CRSF_TIME_BETWEEN_FRAMES_US     6667 // At fastest, frames are sent by the transmitter every 6.667 milliseconds, 150 Hz
 
 #define CRSF_DIGITAL_CHANNEL_MIN 172
@@ -56,9 +57,9 @@
 
 #define CRSF_PAYLOAD_OFFSET offsetof(crsfFrameDef_t, type)
 
-#define CRSF_LINK_STATUS_UPDATE_TIMEOUT_US  250000 // 250ms, 4 Hz mode 1 telemetry
+#define CRSF_LINK_STATUS_UPDATE_TIMEOUT_US  500000 // JBK was 250000
 
-STATIC_UNIT_TESTED bool crsfFrameDone = false;
+STATIC_UNIT_TESTED volatile bool crsfFrameDone = false;
 STATIC_UNIT_TESTED crsfFrame_t crsfFrame;
 STATIC_UNIT_TESTED crsfFrame_t crsfChannelDataFrame;
 STATIC_UNIT_TESTED uint32_t crsfChannelData[CRSF_MAX_CHANNEL];
@@ -69,6 +70,8 @@ static uint8_t telemetryBuf[CRSF_FRAME_SIZE_MAX];
 static uint8_t telemetryBufLen = 0;
 
 static timeUs_t lastRcFrameTimeUs = 0;
+
+timeMs_t lastByteRXtime = 0;
 
 /*
  * CRSF protocol
@@ -119,6 +122,25 @@ struct crsfPayloadRcChannelsPacked_s {
 
 typedef struct crsfPayloadRcChannelsPacked_s crsfPayloadRcChannelsPacked_t;
 
+// A more efficient packet for high freq ExpressLRS
+struct elrsPayloadRcChannelsPacked_s {
+    // 56 bits of data (10 bits per channel * 4 channels + 2 bits per switch * 8 switches) = 7 bytes.
+    unsigned int chan0 : 10;
+    unsigned int chan1 : 10;
+    unsigned int chan2 : 10;
+    unsigned int chan3 : 10;
+    unsigned int aux1 : 2;
+    unsigned int aux2 : 2;
+    unsigned int aux3 : 2;
+    unsigned int aux4 : 2;
+    unsigned int aux5 : 2;
+    unsigned int aux6 : 2;
+    unsigned int aux7 : 2;
+    unsigned int aux8 : 2;
+} __attribute__ ((__packed__));
+
+typedef struct elrsPayloadRcChannelsPacked_s elrsPayloadRcChannelsPacked_t;
+
 #if defined(USE_CRSF_LINK_STATISTICS)
 /*
  * 0x14 Link statistics
@@ -149,6 +171,15 @@ typedef struct crsfPayloadLinkstatistics_s {
     uint8_t downlink_Link_quality;
     int8_t downlink_SNR;
 } crsfLinkStatistics_t;
+
+// Compact version  of link statistics for high frequency links
+typedef struct elrsPayloadLinkstatistics_s {
+    uint8_t rssi;
+    uint8_t link_quality;
+    int8_t snr;
+    uint8_t rf_Mode;
+} elrsLinkStatistics_t;
+
 
 static timeUs_t lastLinkStatisticsFrameUs;
 
@@ -197,6 +228,54 @@ static void handleCrsfLinkStatisticsFrame(const crsfLinkStatistics_t* statsPtr, 
     }
 
 }
+
+static void handleElrsLinkStatisticsFrame(const elrsLinkStatistics_t* statsPtr, timeUs_t currentTimeUs)
+{
+    const elrsLinkStatistics_t stats = *statsPtr;
+    lastLinkStatisticsFrameUs = currentTimeUs;
+    int16_t rssiDbm = -1 * stats.rssi;
+    if (rssiSource == RSSI_SOURCE_RX_PROTOCOL_CRSF) {
+        const uint16_t rssiPercentScaled = scaleRange(rssiDbm, CRSF_RSSI_MIN, 0, 0, RSSI_MAX_VALUE);
+        setRssi(rssiPercentScaled, RSSI_SOURCE_RX_PROTOCOL_CRSF);
+    }
+#ifdef USE_RX_RSSI_DBM
+    if (rxConfig()->crsf_use_rx_snr) {
+        rssiDbm = stats.snr;
+    }
+    setRssiDbm(rssiDbm, RSSI_SOURCE_RX_PROTOCOL_CRSF);
+    int16_t rssiSNR = stats.snr;
+    setRssiSNR(rssiSNR, RSSI_SOURCE_RX_PROTOCOL_CRSF);
+#endif
+
+#ifdef USE_RX_LINK_QUALITY_INFO
+    if (linkQualitySource == LQ_SOURCE_RX_PROTOCOL_CRSF) {
+        setLinkQualityDirect(stats.link_quality);
+        rxSetRfMode(stats.rf_Mode);
+    }
+#endif
+
+    switch (debugMode) {
+    case DEBUG_CRSF_LINK_STATISTICS_UPLINK:
+        DEBUG_SET(DEBUG_CRSF_LINK_STATISTICS_UPLINK, 0, stats.rssi);
+        DEBUG_SET(DEBUG_CRSF_LINK_STATISTICS_UPLINK, 1, stats.snr);
+        DEBUG_SET(DEBUG_CRSF_LINK_STATISTICS_UPLINK, 2, stats.link_quality);
+        DEBUG_SET(DEBUG_CRSF_LINK_STATISTICS_UPLINK, 3, stats.rf_Mode);
+        break;
+    // case DEBUG_CRSF_LINK_STATISTICS_PWR:
+    //     DEBUG_SET(DEBUG_CRSF_LINK_STATISTICS_PWR, 0, stats.active_antenna);
+    //     DEBUG_SET(DEBUG_CRSF_LINK_STATISTICS_PWR, 1, stats.uplink_SNR);
+    //     DEBUG_SET(DEBUG_CRSF_LINK_STATISTICS_PWR, 2, stats.uplink_TX_Power);
+    //     break;
+    // case DEBUG_CRSF_LINK_STATISTICS_DOWN:
+    //     DEBUG_SET(DEBUG_CRSF_LINK_STATISTICS_DOWN, 0, stats.downlink_RSSI);
+    //     DEBUG_SET(DEBUG_CRSF_LINK_STATISTICS_DOWN, 1, stats.downlink_Link_quality);
+    //     DEBUG_SET(DEBUG_CRSF_LINK_STATISTICS_DOWN, 2, stats.downlink_SNR);
+    //     break;
+    }
+
+}
+
+
 #endif
 
 #if defined(USE_CRSF_LINK_STATISTICS)
@@ -239,6 +318,8 @@ STATIC_UNIT_TESTED void crsfDataReceive(uint16_t c, void *data)
 
     static uint8_t crsfFramePosition = 0;
     const timeUs_t currentTimeUs = microsISR();
+    
+    lastByteRXtime = millis();
 
 #ifdef DEBUG_CRSF_PACKETS
     debug[2] = currentTimeUs - crsfFrameStartAtUs;
@@ -257,7 +338,7 @@ STATIC_UNIT_TESTED void crsfDataReceive(uint16_t c, void *data)
     // full frame length includes the length of the address and framelength fields
     const int fullFrameLength = crsfFramePosition < 3 ? 5 : crsfFrame.frame.frameLength + CRSF_FRAME_LENGTH_ADDRESS + CRSF_FRAME_LENGTH_FRAMELENGTH;
 
-    if (crsfFramePosition < fullFrameLength) {
+    if (crsfFramePosition < fullFrameLength) {  // XXX JBK if this test fails, we're not reading any more data until the timeout hits, which was 1.1 ms
         crsfFrame.bytes[crsfFramePosition++] = (uint8_t)c;
         if (crsfFramePosition >= fullFrameLength) {
             crsfFramePosition = 0;
@@ -266,10 +347,11 @@ STATIC_UNIT_TESTED void crsfDataReceive(uint16_t c, void *data)
                 switch (crsfFrame.frame.type)
                 {
                     case CRSF_FRAMETYPE_RC_CHANNELS_PACKED:
+                    case CRSF_FRAMETYPE_RC_ELRS:
                         if (crsfFrame.frame.deviceAddress == CRSF_ADDRESS_FLIGHT_CONTROLLER) {
                             lastRcFrameTimeUs = currentTimeUs;
-                            crsfFrameDone = true;
                             memcpy(&crsfChannelDataFrame, &crsfFrame, sizeof(crsfFrame));
+                            crsfFrameDone = true;
                         }
                         break;
 
@@ -305,6 +387,17 @@ STATIC_UNIT_TESTED void crsfDataReceive(uint16_t c, void *data)
                          }
                         break;
                     }
+                    
+                    case CRSF_FRAMETYPE_LINK_STATISTICS_ELRS: {
+                         if ((rssiSource == RSSI_SOURCE_RX_PROTOCOL_CRSF) &&
+                             (crsfFrame.frame.deviceAddress == CRSF_ADDRESS_FLIGHT_CONTROLLER) &&
+                             (crsfFrame.frame.frameLength == CRSF_FRAME_ORIGIN_DEST_SIZE + CRSF_FRAME_ELRS_STATISTICS_PAYLOAD_SIZE)) {
+                             const elrsLinkStatistics_t* statsFrame = (const elrsLinkStatistics_t*)&crsfFrame.frame.payload;
+                             handleElrsLinkStatisticsFrame(statsFrame, currentTimeUs);
+                         }
+                        break;
+                    }
+                    
 #endif
                     default:
                         break;
@@ -324,25 +417,52 @@ STATIC_UNIT_TESTED uint8_t crsfFrameStatus(rxRuntimeState_t *rxRuntimeState)
     if (crsfFrameDone) {
         crsfFrameDone = false;
 
-        // unpack the RC channels
         const crsfPayloadRcChannelsPacked_t* const rcChannels = (crsfPayloadRcChannelsPacked_t*)&crsfChannelDataFrame.frame.payload;
-        crsfChannelData[0] = rcChannels->chan0;
-        crsfChannelData[1] = rcChannels->chan1;
-        crsfChannelData[2] = rcChannels->chan2;
-        crsfChannelData[3] = rcChannels->chan3;
-        crsfChannelData[4] = rcChannels->chan4;
-        crsfChannelData[5] = rcChannels->chan5;
-        crsfChannelData[6] = rcChannels->chan6;
-        crsfChannelData[7] = rcChannels->chan7;
-        crsfChannelData[8] = rcChannels->chan8;
-        crsfChannelData[9] = rcChannels->chan9;
-        crsfChannelData[10] = rcChannels->chan10;
-        crsfChannelData[11] = rcChannels->chan11;
-        crsfChannelData[12] = rcChannels->chan12;
-        crsfChannelData[13] = rcChannels->chan13;
-        crsfChannelData[14] = rcChannels->chan14;
-        crsfChannelData[15] = rcChannels->chan15;
-        return RX_FRAME_COMPLETE;
+        const elrsPayloadRcChannelsPacked_t* const elrsChannels = (elrsPayloadRcChannelsPacked_t*)&crsfChannelDataFrame.frame.payload;
+        
+        switch (crsfChannelDataFrame.frame.type) {
+            case CRSF_FRAMETYPE_RC_CHANNELS_PACKED:
+                // unpack the RC channels
+                crsfChannelData[0] = rcChannels->chan0;
+                crsfChannelData[1] = rcChannels->chan1;
+                crsfChannelData[2] = rcChannels->chan2;
+                crsfChannelData[3] = rcChannels->chan3;
+                crsfChannelData[4] = rcChannels->chan4;
+                crsfChannelData[5] = rcChannels->chan5;
+                crsfChannelData[6] = rcChannels->chan6;
+                crsfChannelData[7] = rcChannels->chan7;
+                crsfChannelData[8] = rcChannels->chan8;
+                crsfChannelData[9] = rcChannels->chan9;
+                crsfChannelData[10] = rcChannels->chan10;
+                crsfChannelData[11] = rcChannels->chan11;
+                crsfChannelData[12] = rcChannels->chan12;
+                crsfChannelData[13] = rcChannels->chan13;
+                crsfChannelData[14] = rcChannels->chan14;
+                crsfChannelData[15] = rcChannels->chan15;
+                return RX_FRAME_COMPLETE;   // EARLY RETURN
+
+            case CRSF_FRAMETYPE_RC_ELRS:
+                // unpack the RC channels
+                // map(Val, 0, 2, 188, 1795)
+                crsfChannelData[0] = elrsChannels->chan0 << 1;
+                crsfChannelData[1] = elrsChannels->chan1 << 1;
+                crsfChannelData[2] = elrsChannels->chan2 << 1;
+                crsfChannelData[3] = elrsChannels->chan3 << 1;
+                crsfChannelData[4] = elrsChannels->aux1 * 804 + 188;
+                crsfChannelData[5] = elrsChannels->aux2 * 804 + 188;
+                crsfChannelData[6] = elrsChannels->aux3 * 804 + 188;
+                crsfChannelData[7] = elrsChannels->aux4 * 804 + 188;
+                crsfChannelData[8] = elrsChannels->aux5 * 804 + 188;
+                crsfChannelData[9] = elrsChannels->aux6 * 804 + 188;
+                crsfChannelData[10] = elrsChannels->aux7 * 804 + 188;
+                crsfChannelData[11] = elrsChannels->aux8 * 804 + 188;
+                return RX_FRAME_COMPLETE;   // EARLY RETURN
+                
+            // default:
+                // shouldn't get here
+                // any recovery or error handling?
+        }
+
     }
     return RX_FRAME_PENDING;
 }
