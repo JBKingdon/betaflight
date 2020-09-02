@@ -456,7 +456,7 @@ FAST_CODE_NOINLINE void rcSmoothingSetFilterCutoffs(rcSmoothingFilter_t *smoothi
     // update or initialize the derivative filter
     oldCutoff = smoothingData->derivativeCutoffFrequency;
     if ((rcSmoothingData.derivativeFilterType != RC_SMOOTHING_DERIVATIVE_OFF)
-        && (currentPidProfile->ff_interpolate_sp == FF_INTERPOLATE_OFF)
+        && (currentPidProfile->ff_interpolate_sp == FF_INTERPOLATE_OFF) // XXX jbk is this correct or not?
         && (rcSmoothingData.derivativeCutoffSetting == 0)) {
 
         smoothingData->derivativeCutoffFrequency = calcRcSmoothingCutoff(smoothingData->averageFrameTimeUs, (smoothingData->derivativeFilterType == RC_SMOOTHING_DERIVATIVE_PT1), smoothingData->autoSmoothnessFactor);

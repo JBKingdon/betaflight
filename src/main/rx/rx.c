@@ -122,6 +122,9 @@ uint32_t rcInvalidPulsPeriod[MAX_SUPPORTED_RC_CHANNEL_COUNT];
 rxRuntimeState_t rxRuntimeState;
 static uint8_t rcSampleIndex = 0;
 
+// JBK for debugging crsf uart
+extern timeMs_t lastByteRXtime;
+
 PG_REGISTER_ARRAY_WITH_RESET_FN(rxChannelRangeConfig_t, NON_AUX_CHANNEL_COUNT, rxChannelRangeConfigs, PG_RX_CHANNEL_RANGE_CONFIG, 0);
 void pgResetFn_rxChannelRangeConfigs(rxChannelRangeConfig_t *rxChannelRangeConfigs)
 {
@@ -485,6 +488,7 @@ bool rxUpdateCheck(timeUs_t currentTimeUs, timeDelta_t currentDeltaTimeUs)
             if (frameStatus & RX_FRAME_COMPLETE) {
                 rxIsInFailsafeMode = (frameStatus & RX_FRAME_FAILSAFE) != 0;
                 bool rxFrameDropped = (frameStatus & RX_FRAME_DROPPED) != 0;
+                // DEBUG_SET(DEBUG_RX_SIGNAL_LOSS, 2, rxFrameDropped); // XXX JBK add
                 signalReceived = !(rxIsInFailsafeMode || rxFrameDropped);
                 if (signalReceived) {
                     needRxSignalBefore = currentTimeUs + needRxSignalMaxDelayUs;
@@ -650,7 +654,10 @@ static void detectAndApplySignalLossBehaviour(void)
             rcData[channel] = getRxfailValue(channel);
         }
     }
-    DEBUG_SET(DEBUG_RX_SIGNAL_LOSS, 3, rcData[THROTTLE]);
+    // DEBUG_SET(DEBUG_RX_SIGNAL_LOSS, 3, rcData[THROTTLE]);
+    // DEBUG_SET(DEBUG_RX_SIGNAL_LOSS, 2, currentTimeMs);
+    DEBUG_SET(DEBUG_RX_SIGNAL_LOSS, 3, currentTimeMs - lastByteRXtime);
+    
 }
 
 bool calculateRxChannelsAndUpdateFailsafe(timeUs_t currentTimeUs)
@@ -659,13 +666,17 @@ bool calculateRxChannelsAndUpdateFailsafe(timeUs_t currentTimeUs)
         auxiliaryProcessingRequired = !rxRuntimeState.rcProcessFrameFn(&rxRuntimeState);
     }
 
-    if (!rxDataProcessingRequired) {
+    DEBUG_SET(DEBUG_RX_SIGNAL_LOSS, 2, rxDataProcessingRequired); // remained 'true' throughout rxloss event
+
+
+    if (!rxDataProcessingRequired) { // could we be taking this? No, doesn't seem to be
         return false;
     }
 
     rxDataProcessingRequired = false;
     rxNextUpdateAtUs = currentTimeUs + DELAY_33_HZ;
 
+    // Only used for PWM/PPM
     // only proceed when no more samples to skip and suspend period is over
     if (skipRxSamples || currentTimeUs <= suspendRxSignalUntil) {
         if (currentTimeUs > suspendRxSignalUntil) {
