@@ -43,6 +43,7 @@ static float prevSetpointSpeed[XYZ_AXIS_COUNT];
 static float prevAcceleration[XYZ_AXIS_COUNT];
 static float prevRawSetpoint[XYZ_AXIS_COUNT];
 static float prevDeltaImpl[XYZ_AXIS_COUNT];
+static float prevBoostAmount[XYZ_AXIS_COUNT];
 static bool bigStep[XYZ_AXIS_COUNT];
 static uint8_t averagingCount;
 
@@ -144,18 +145,8 @@ FAST_CODE_NOINLINE float interpolatedSpApply(int axis, bool newRcFrame, ffInterp
         setpointAccelerationModified *= pidGetDT();
 
         const float ffBoostFactor = pidGetFfBoostFactor();
-        float clip = 1.0f;
         float boostAmount = 0.0f;
         if (ffBoostFactor != 0.0f) {
-            //calculate clip factor to reduce boost on big spikes
-            if (pidGetSpikeLimitInverse()) {
-                clip = 1 / (1 + (setpointAcceleration * setpointAcceleration * pidGetSpikeLimitInverse()));
-                clip *= clip;
-            }
-            // don't clip first step inwards from max deflection
-            if (fabsf(prevRawSetpoint[axis]) > 0.95f * ffMaxRate[axis] && fabsf(setpointSpeed) > 3.0f * fabsf(prevSetpointSpeed[axis])) {
-                clip = 1.0f;
-            }
             // calculate boost and prevent kick-back spike at max deflection
             if (fabsf(rawSetpoint) < 0.95f * ffMaxRate[axis] || fabsf(setpointSpeed) > 3.0f * fabsf(prevSetpointSpeed[axis])) {
                 boostAmount = ffBoostFactor * setpointAccelerationModified;
@@ -172,10 +163,14 @@ FAST_CODE_NOINLINE float interpolatedSpApply(int axis, bool newRcFrame, ffInterp
             DEBUG_SET(DEBUG_FF_INTERPOLATED, 3, holdCount[axis]);
         }
 
-        setpointDeltaImpl[axis] += boostAmount * clip;
-
-        // first order (kind of) smoothing of FF
+        // first order smoothing / integration of boost to reduce jitter 
         const float ffSmoothFactor = pidGetFfSmoothFactor();
+        boostAmount = prevBoostAmount[axis] + ffSmoothFactor * (boostAmount - prevBoostAmount[axis]);
+        prevBoostAmount[axis] = boostAmount;
+
+        setpointDeltaImpl[axis] += boostAmount;
+
+        // first order smoothing / integration of FF
         setpointDeltaImpl[axis] = prevDeltaImpl[axis] + ffSmoothFactor * (setpointDeltaImpl[axis] - prevDeltaImpl[axis]);
         prevDeltaImpl[axis] = setpointDeltaImpl[axis];
 
