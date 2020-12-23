@@ -75,6 +75,8 @@ const char rcChannelLetters[] = "AERT12345678abcdefgh";
 
 static uint16_t rssi = 0;                  // range: [0;1023]
 static int16_t rssiDbm = CRSF_RSSI_MIN;    // range: [-130,20]
+static int16_t rssiDbm1 = CRSF_RSSI_MIN;    // range: [-130,20] Additional rssi for 2nd antenna
+static uint8_t activeAntenna = 0;           // range: 0,1
 static int16_t rssiSNR = CRSF_SNR_MIN;    // range: ?
 static timeUs_t lastMspRssiUpdateUs = 0;
 
@@ -838,6 +840,12 @@ int16_t getRssiDbm(void)
     return rssiDbm;
 }
 
+int16_t getRssiDbm1(void)
+{
+    return rssiDbm1;
+}
+
+
 int16_t getRssiSNR(void)
 {
     return rssiSNR;
@@ -897,6 +905,22 @@ void setRssiDbm(int16_t rssiDbmValue, rssiSource_e source)
 
     rssiDbm = updateRssiDbmSamples(rssiDbmValue);
 }
+
+void setRssiDbm1(int16_t rssiDbmValue)
+{
+    rssiDbm1 = rssiDbmValue;
+}
+
+int8_t getActiveAntenna(void)
+{
+    return activeAntenna;
+}
+
+void setActiveAntenna(int8_t antenna)
+{
+    activeAntenna = antenna;
+}
+
 
 void setRssiDbmDirect(int16_t newRssiDbm, rssiSource_e source)
 {
