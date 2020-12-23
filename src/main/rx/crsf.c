@@ -174,10 +174,10 @@ typedef struct crsfPayloadLinkstatistics_s {
 
 // Compact version  of link statistics for high frequency links
 typedef struct elrsPayloadLinkstatistics_s {
-    uint8_t rssi;
-    uint8_t link_quality;
-    int8_t snr;
-    uint8_t rf_Mode;
+    uint8_t rssi0, rssi1;
+    uint8_t link_quality;   // contains active antenna indicator in bit 7
+    // int8_t snr;
+    uint8_t rf_Mode;        // spare bits in here available for use
 } elrsLinkStatistics_t;
 
 
@@ -233,33 +233,40 @@ static void handleElrsLinkStatisticsFrame(const elrsLinkStatistics_t* statsPtr, 
 {
     const elrsLinkStatistics_t stats = *statsPtr;
     lastLinkStatisticsFrameUs = currentTimeUs;
-    int16_t rssiDbm = -1 * stats.rssi;
+
+    uint8_t linkQuality = stats.link_quality & 0x7F;
+    uint8_t antenna = stats.link_quality >> 7;   // XXX need somewhere to save the active antenna and a way of displaying it in the osd
+
+    int16_t rssiDbm = -stats.rssi0;
+
     if (rssiSource == RSSI_SOURCE_RX_PROTOCOL_CRSF) {
         const uint16_t rssiPercentScaled = scaleRange(rssiDbm, CRSF_RSSI_MIN, 0, 0, RSSI_MAX_VALUE);
         setRssi(rssiPercentScaled, RSSI_SOURCE_RX_PROTOCOL_CRSF);
     }
 #ifdef USE_RX_RSSI_DBM
     if (rxConfig()->crsf_use_rx_snr) {
-        rssiDbm = stats.snr;
+        // rssiDbm = stats.snr;
     }
     setRssiDbm(rssiDbm, RSSI_SOURCE_RX_PROTOCOL_CRSF);
-    int16_t rssiSNR = stats.snr;
-    setRssiSNR(rssiSNR, RSSI_SOURCE_RX_PROTOCOL_CRSF);
+    setRssiDbm1(-stats.rssi1);
+    // int16_t rssiSNR = stats.snr;
+    // setRssiSNR(rssiSNR, RSSI_SOURCE_RX_PROTOCOL_CRSF);
 #endif
 
 #ifdef USE_RX_LINK_QUALITY_INFO
     if (linkQualitySource == LQ_SOURCE_RX_PROTOCOL_CRSF) {
-        setLinkQualityDirect(stats.link_quality);
+        setLinkQualityDirect(linkQuality);
         rxSetRfMode(stats.rf_Mode);
     }
 #endif
 
     switch (debugMode) {
     case DEBUG_CRSF_LINK_STATISTICS_UPLINK:
-        DEBUG_SET(DEBUG_CRSF_LINK_STATISTICS_UPLINK, 0, stats.rssi);
-        DEBUG_SET(DEBUG_CRSF_LINK_STATISTICS_UPLINK, 1, stats.snr);
-        DEBUG_SET(DEBUG_CRSF_LINK_STATISTICS_UPLINK, 2, stats.link_quality);
-        DEBUG_SET(DEBUG_CRSF_LINK_STATISTICS_UPLINK, 3, stats.rf_Mode);
+        DEBUG_SET(DEBUG_CRSF_LINK_STATISTICS_UPLINK, 0, stats.rssi0);
+        DEBUG_SET(DEBUG_CRSF_LINK_STATISTICS_UPLINK, 1, stats.rssi1);
+        DEBUG_SET(DEBUG_CRSF_LINK_STATISTICS_UPLINK, 2, linkQuality);
+        // DEBUG_SET(DEBUG_CRSF_LINK_STATISTICS_UPLINK, 3, stats.rf_Mode);
+        DEBUG_SET(DEBUG_CRSF_LINK_STATISTICS_UPLINK, 3, antenna);
         break;
     // case DEBUG_CRSF_LINK_STATISTICS_PWR:
     //     DEBUG_SET(DEBUG_CRSF_LINK_STATISTICS_PWR, 0, stats.active_antenna);
@@ -391,7 +398,8 @@ STATIC_UNIT_TESTED void crsfDataReceive(uint16_t c, void *data)
                     case CRSF_FRAMETYPE_LINK_STATISTICS_ELRS: {
                          if ((rssiSource == RSSI_SOURCE_RX_PROTOCOL_CRSF) &&
                              (crsfFrame.frame.deviceAddress == CRSF_ADDRESS_FLIGHT_CONTROLLER) &&
-                             (crsfFrame.frame.frameLength == CRSF_FRAME_ORIGIN_DEST_SIZE + CRSF_FRAME_ELRS_STATISTICS_PAYLOAD_SIZE)) {
+                             (crsfFrame.frame.frameLength == CRSF_FRAME_ORIGIN_DEST_SIZE + CRSF_FRAME_ELRS_STATISTICS_PAYLOAD_SIZE)) 
+                         {
                              const elrsLinkStatistics_t* statsFrame = (const elrsLinkStatistics_t*)&crsfFrame.frame.payload;
                              handleElrsLinkStatisticsFrame(statsFrame, currentTimeUs);
                          }

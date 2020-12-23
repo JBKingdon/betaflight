@@ -197,8 +197,13 @@ void setLinkQualityDirect(uint16_t linkqualityValue);
 uint16_t rxGetLinkQualityPercent(void);
 
 int16_t getRssiDbm(void);
+int16_t getRssiDbm1(void);
 void setRssiDbm(int16_t newRssiDbm, rssiSource_e source);
+void setRssiDbm1(int16_t newRssiDbm);
 void setRssiDbmDirect(int16_t newRssiDbm, rssiSource_e source);
+
+int8_t getActiveAntenna(void);
+void setActiveAntenna(int8_t antenna);
 
 int16_t getRssiSNR(void);
 void setRssiSNR(int16_t newRssiSNR, rssiSource_e source);
