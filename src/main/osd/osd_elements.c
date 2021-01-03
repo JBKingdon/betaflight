@@ -999,7 +999,7 @@ static void osdElementLinkQuality(osdElementParms_t *element)
         if (osdLinkQuality >= 10) {
             osdLinkQuality = 9;
         }
-        tfp_sprintf(element->buff, "%c%1d", SYM_LINK_QUALITY, osdLinkQuality);
+        tfp_sprintf(element->buff, "%c%02d", SYM_LINK_QUALITY, osdLinkQuality); // XXX JBK %02d untested, was %1d
     }
 }
 #endif // USE_RX_LINK_QUALITY_INFO
@@ -1193,10 +1193,21 @@ static void osdElementRtcTime(osdElementParms_t *element)
 #ifdef USE_RX_RSSI_DBM
 static void osdElementRssiDbm(osdElementParms_t *element)
 {
+    static bool usesDiversity = false;
+
     // int8_t snrUnits = getRssiSNR() / 10;
     // int8_t snrTenths = getRssiSNR() % 10;
     // tfp_sprintf(element->buff, "%c%3d/%2d.%u", SYM_RSSI, getRssiDbm(), snrUnits, snrTenths);
-    tfp_sprintf(element->buff, "%c%d:%3d/%3d", SYM_RSSI, getActiveAntenna(), getRssiDbm(), getRssiDbm1());
+
+    int16_t rssi1 = getRssiDbm1();
+    if (rssi1 != 255) {
+        usesDiversity = true;
+    }
+    if (usesDiversity) {
+        tfp_sprintf(element->buff, "%c%d:%3d/%3d", SYM_RSSI, getActiveAntenna(), getRssiDbm(), rssi1);
+    } else {
+        tfp_sprintf(element->buff, "%c:%3d", SYM_RSSI, getRssiDbm());
+    }
 }
 #endif // USE_RX_RSSI_DBM
 
