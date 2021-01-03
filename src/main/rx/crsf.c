@@ -237,6 +237,8 @@ static void handleElrsLinkStatisticsFrame(const elrsLinkStatistics_t* statsPtr, 
     uint8_t linkQuality = stats.link_quality & 0x7F;
     uint8_t antenna = stats.link_quality >> 7;   // XXX need somewhere to save the active antenna and a way of displaying it in the osd
 
+    setActiveAntenna(antenna);
+
     int16_t rssiDbm = -stats.rssi0;
 
     if (rssiSource == RSSI_SOURCE_RX_PROTOCOL_CRSF) {
