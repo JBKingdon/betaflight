@@ -976,13 +976,13 @@ static void osdElementLinkQuality(osdElementParms_t *element)
     if (linkQualitySource == LQ_SOURCE_RX_PROTOCOL_CRSF) { // 0-99
         osdLinkQuality = rxGetLinkQuality();
         const uint8_t osdRfMode = rxGetRfMode();
-        tfp_sprintf(element->buff, "%c%1d:%2d", SYM_LINK_QUALITY, osdRfMode, osdLinkQuality);
+        tfp_sprintf(element->buff, "%c%1d:%02d", SYM_LINK_QUALITY, osdRfMode, osdLinkQuality);
     } else { // 0-9
         osdLinkQuality = rxGetLinkQuality() * 10 / LINK_QUALITY_MAX_VALUE;
         if (osdLinkQuality >= 10) {
             osdLinkQuality = 9;
         }
-        tfp_sprintf(element->buff, "%c%02d", SYM_LINK_QUALITY, osdLinkQuality); // XXX JBK %02d untested, was %1d
+        tfp_sprintf(element->buff, "%c%1d", SYM_LINK_QUALITY, osdLinkQuality);
     }
 }
 #endif // USE_RX_LINK_QUALITY_INFO
@@ -1170,17 +1170,13 @@ static void osdElementRtcTime(osdElementParms_t *element)
 #ifdef USE_RX_RSSI_DBM
 static void osdElementRssiDbm(osdElementParms_t *element)
 {
-    static bool usesDiversity = false;
-
     // int8_t snrUnits = getRssiSNR() / 10;
     // int8_t snrTenths = getRssiSNR() % 10;
     // tfp_sprintf(element->buff, "%c%3d/%2d.%u", SYM_RSSI, getRssiDbm(), snrUnits, snrTenths);
 
     int16_t rssi1 = getRssiDbm1();
-    if (rssi1 != 255) {
-        usesDiversity = true;
-    }
-    if (usesDiversity) {
+    // -255 used when only a single antenna is present
+    if (rssi1 != -255) {
         tfp_sprintf(element->buff, "%c%d:%3d/%3d", SYM_RSSI, getActiveAntenna(), getRssiDbm(), rssi1);
     } else {
         tfp_sprintf(element->buff, "%c:%3d", SYM_RSSI, getRssiDbm());
