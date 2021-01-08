@@ -1197,9 +1197,11 @@ static void osdElementRssiDbm(osdElementParms_t *element)
     int16_t rssi1 = getRssiDbm1();
     // -255 used when only a single antenna is present
     if (rssi1 != -255) {
+        // we have rssi for both values so display active antenna, rssi0, rssi1
         tfp_sprintf(element->buff, "%c%d:%3d/%3d", SYM_RSSI, getActiveAntenna(), getRssiDbm(), rssi1);
     } else {
-        tfp_sprintf(element->buff, "%c:%3d", SYM_RSSI, getRssiDbm());
+        // Simpified display for only 1 rssi value
+        tfp_sprintf(element->buff, "%c%3d", SYM_RSSI, getRssiDbm());
     }
 }
 #endif // USE_RX_RSSI_DBM
