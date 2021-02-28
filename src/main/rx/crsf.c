@@ -50,14 +50,14 @@
 
 // #define CRSF_TIME_NEEDED_PER_FRAME_US   1100 // 700 us + 400 us for potential ad-hoc request
 #define CRSF_TIME_NEEDED_PER_FRAME_US   500 // JBK has to be less than the packet interval. With ELRS extensions and 600k baud actual uart time is about 200us
-#define CRSF_TIME_BETWEEN_FRAMES_US     6667 // At fastest, frames are sent by the transmitter every 6.667 milliseconds, 150 Hz
+#define CRSF_TIME_BETWEEN_FRAMES_US     6667 // At fastest, frames are sent by the transmitter every 6.667 milliseconds, 150 Hz // JBK no longer true - impact?
 
-#define CRSF_DIGITAL_CHANNEL_MIN 172
+#define CRSF_DIGITAL_CHANNEL_MIN 172    // TODO CLEAN-UP these limits and the scaling issues they cause
 #define CRSF_DIGITAL_CHANNEL_MAX 1811
 
 #define CRSF_PAYLOAD_OFFSET offsetof(crsfFrameDef_t, type)
 
-#define CRSF_LINK_STATUS_UPDATE_TIMEOUT_US  500000 // JBK was 250000
+#define CRSF_LINK_STATUS_UPDATE_TIMEOUT_US  500000 // JBK was 250000. TODO investigate increasing the status rate again
 
 STATIC_UNIT_TESTED volatile bool crsfFrameDone = false;
 STATIC_UNIT_TESTED crsfFrame_t crsfFrame;
@@ -79,7 +79,7 @@ timeMs_t lastByteRXtime = 0;
  * CRSF protocol uses a single wire half duplex uart connection.
  * The master sends one frame every 4ms and the slave replies between two frames from the master.
  *
- * 420000 baud
+ * 420000 baud  // JBK for ExpressLRS, use faster rates and smaller packets
  * not inverted
  * 8 Bit
  * 1 Stop bit
@@ -534,7 +534,9 @@ bool crsfRxInit(const rxConfig_t *rxConfig, rxRuntimeState_t *rxRuntimeState)
         FUNCTION_RX_SERIAL,
         crsfDataReceive,
         NULL,
-        CRSF_BAUDRATE,
+        // JBK configurable
+        // CRSF_BAUDRATE,  
+        rxConfig->crsf_baud * 100,
         CRSF_PORT_MODE,
         CRSF_PORT_OPTIONS | (rxConfig->serialrx_inverted ? SERIAL_INVERTED : 0)
         );

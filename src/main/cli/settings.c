@@ -774,6 +774,7 @@ const clivalue_t valueTable[] = {
 #endif
 #if defined(USE_SERIALRX_CRSF)
     { "crsf_use_rx_snr",          VAR_UINT8  | MASTER_VALUE | MODE_LOOKUP, .config.lookup = { TABLE_OFF_ON }, PG_RX_CONFIG, offsetof(rxConfig_t, crsf_use_rx_snr) },
+    { "crsf_baud",                VAR_UINT16  | MASTER_VALUE, .config.minmaxUnsigned = {4000,10240}, PG_RX_CONFIG, offsetof(rxConfig_t, crsf_baud) },
 #endif
     { "airmode_start_throttle_percent",     VAR_UINT8 | MASTER_VALUE, .config.minmaxUnsigned = { 0, 100 }, PG_RX_CONFIG, offsetof(rxConfig_t, airModeActivateThreshold) },
     { "rx_min_usec",                VAR_UINT16 | MASTER_VALUE, .config.minmaxUnsigned = { PWM_PULSE_MIN, PWM_PULSE_MAX }, PG_RX_CONFIG, offsetof(rxConfig_t, rx_min_usec) },

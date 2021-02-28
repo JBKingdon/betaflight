@@ -27,8 +27,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+// XXX This is now ignored, baud specified in cli using crsf_baud (default 420000)
 // #define CRSF_BAUDRATE           420000
-#define CRSF_BAUDRATE           691200
+// JBK Faster rate for ExpressLRS
+// #define CRSF_BAUDRATE           691200
 
 enum { CRSF_SYNC_BYTE = 0xC8 };
 
